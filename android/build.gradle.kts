@@ -30,8 +30,8 @@ subprojects {
 
                 // 2. Fix lỗi lStar not found
                 // Ép thư viện con (ota_update) phải biên dịch bằng SDK 34 mới hiểu được lStar
-                android.compileSdk = 34
-                android.defaultConfig.targetSdk = 34
+                android.compileSdk = 36
+                android.defaultConfig.targetSdk = 36
             }
         } catch (e: Exception) {
             println("Skipping build config fix for ${project.name}")

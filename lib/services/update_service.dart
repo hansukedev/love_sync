@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:r_upgrade/r_upgrade.dart'; // 👇 Import mới
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file_plus/open_file_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 
 class UpdateService {
@@ -10,23 +14,23 @@ class UpdateService {
 
   Future<void> checkUpdate(BuildContext context) async {
     try {
-      // 1. Lấy version hiện tại
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
       String currentVersion = packageInfo.version;
 
-      // 2. Lấy info từ GitHub
       final response = await http.get(Uri.parse(repoUrl));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         String latestTag = data['tag_name'];
         String latestVersion = latestTag.replaceAll('v', '');
-
-        // Lấy link tải APK
         String downloadUrl = data['assets'][0]['browser_download_url'];
 
-        // 3. So sánh
+        // Debug log
+        debugPrint("Current: $currentVersion, Latest: $latestVersion");
+
         if (latestVersion != currentVersion) {
-          _showUpdateDialog(context, downloadUrl, latestTag);
+          if (context.mounted) {
+            _showUpdateDialog(context, downloadUrl, latestTag);
+          }
         }
       }
     } catch (e) {
@@ -40,7 +44,7 @@ class UpdateService {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: Text("Có bản cập nhật mới! ($version)"),
-        content: Text("Bấm cập nhật để tải về và cài đặt tự động."),
+        content: Text("Bấm cập nhật để tải về và cài đặt."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -49,7 +53,7 @@ class UpdateService {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              _runUpgrade(url); // 👇 Gọi hàm cài mới
+              _downloadAndInstall(context, url);
             },
             child: Text("Cập nhật ngay"),
           ),
@@ -58,20 +62,64 @@ class UpdateService {
     );
   }
 
-  // 👇 Hàm chạy cập nhật bằng r_upgrade
-  Future<void> _runUpgrade(String url) async {
-    try {
-      // Nó sẽ tự hiện thanh thông báo trên thanh trạng thái (Notification bar)
-      await RUpgrade.upgrade(
-        url,
-        fileName: 'love_sync_update.apk',
-        installType: RUpgradeInstallType
-            .normal, // Tự động bung cửa sổ cài đặt khi tải xong
-        notificationStyle:
-            NotificationStyle.speechAndPlanTime, // Kiểu thông báo đẹp
+  Future<void> _downloadAndInstall(BuildContext context, String url) async {
+    // 1. Xin quyền (Chủ yếu cho Android < 10)
+    var status = await Permission.storage.request();
+    if (status.isDenied) {
+      debugPrint("Không có quyền ghi file");
+      return;
+    }
+
+    // Hiển thị loading (đơn giản)
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Đang tải bản cập nhật... Vui lòng đợi.")),
       );
+    }
+
+    try {
+      // 2. Xác định đường dẫn lưu file
+      // Dùng getExternalCacheDirectories an toàn hơn cho việc cài đặt
+      Directory? tempDir = await getExternalStorageDirectory();
+      // Nếu null thì fallback về temporary
+      tempDir ??= await getTemporaryDirectory();
+
+      String savePath = "${tempDir.path}/love_sync_update.apk";
+
+      // 3. Tải file bằng Dio
+      await Dio().download(
+        url,
+        savePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            debugPrint(
+              "Download: ${(received / total * 100).toStringAsFixed(0)}%",
+            );
+            // Bạn có thể update UI progress bar ở đây nếu muốn
+          }
+        },
+      );
+
+      debugPrint("Tải xong: $savePath");
+
+      // 4. Mở file để cài đặt
+      final result = await OpenFile.open(savePath);
+      debugPrint("Open result: ${result.type} - ${result.message}");
+
+      if (result.type != ResultType.done) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Lỗi mở file: ${result.message}")),
+          );
+        }
+      }
     } catch (e) {
-      debugPrint('Lỗi update: $e');
+      debugPrint("Lỗi download/install: $e");
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Lỗi: $e")));
+      }
     }
   }
 }

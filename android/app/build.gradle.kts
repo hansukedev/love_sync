@@ -12,7 +12,7 @@ android {
     namespace = "com.example.love_sync"
     
     // 👇 SỬA Ở ĐÂY: Đổi từ flutter.compileSdkVersion thành 34
-    compileSdk = 34 
+    compileSdk = 36 
     
     ndkVersion = flutter.ndkVersion
 
@@ -33,7 +33,7 @@ android {
         minSdk = flutter.minSdkVersion
         
         // 👇 SỬA Ở ĐÂY: Đổi từ flutter.targetSdkVersion thành 34
-        targetSdk = 34
+        targetSdk = 36
         
         versionCode = flutter.versionCode
         versionName = flutter.versionName
