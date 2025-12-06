@@ -21,6 +21,12 @@ class _PairingScreenState extends State<PairingScreen> {
   bool _isCreating = false;
 
   @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
 
@@ -103,9 +109,11 @@ class _PairingScreenState extends State<PairingScreen> {
               ElevatedButton.icon(
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: _generatedCode!));
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('Copied!')));
+                  if (mounted) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('Copied!')));
+                  }
                 },
                 icon: const Icon(Icons.copy, size: 18),
                 label: const Text('Copy Code'),
@@ -131,12 +139,14 @@ class _PairingScreenState extends State<PairingScreen> {
                 ),
               ),
 
-              // Hidden Stream Listener
+              // Hidden Stream Listener để tự động chuyển trang khi có người vào
               StreamBuilder<DatabaseEvent>(
                 stream: _currentCoupleId != null
                     ? auth.getCoupleStream(_currentCoupleId!)
                     : null,
                 builder: (context, snapshot) {
+                  // Logic tự động chuyển sang Home khi trạng thái đổi sang 'paired'
+                  // có thể xử lý ở đây hoặc để main.dart lo (StreamBuilder ở main.dart an toàn hơn)
                   return const SizedBox.shrink();
                 },
               ),
@@ -144,7 +154,13 @@ class _PairingScreenState extends State<PairingScreen> {
               ElevatedButton(
                 onPressed: () async {
                   setState(() => _isCreating = true);
+
+                  // Gọi hàm tạo code
                   final result = await auth.createPairingCode();
+
+                  // 👇 QUAN TRỌNG: Kiểm tra mounted trước khi setState
+                  if (!mounted) return;
+
                   if (result != null) {
                     setState(() {
                       _generatedCode = result['code'];
@@ -153,6 +169,13 @@ class _PairingScreenState extends State<PairingScreen> {
                     });
                   } else {
                     setState(() => _isCreating = false);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to generate code'),
+                        ),
+                      );
+                    }
                   }
                 },
                 child: const Text('Generate Code'),
@@ -198,15 +221,22 @@ class _PairingScreenState extends State<PairingScreen> {
             else
               ElevatedButton(
                 onPressed: () async {
+                  // 1. Gọi hàm Join
                   bool success = await auth.joinPairingCode(
                     _codeController.text.trim().toUpperCase(),
                   );
-                  if (success && mounted) {
-                    Navigator.pushReplacement(
+
+                  // 👇 QUAN TRỌNG: Kiểm tra mounted
+                  if (!mounted) return;
+
+                  if (success) {
+                    // Chuyển sang Home (xóa hết các màn hình cũ)
+                    Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(builder: (_) => const HomeScreen()),
+                      (route) => false,
                     );
-                  } else if (auth.errorMessage != null && mounted) {
+                  } else if (auth.errorMessage != null) {
                     ScaffoldMessenger.of(
                       context,
                     ).showSnackBar(SnackBar(content: Text(auth.errorMessage!)));
