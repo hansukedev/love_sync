@@ -17,8 +17,7 @@ subprojects {
 }
 
 subprojects {
-
-    // Tự động thêm namespace cho các thư viện cũ (như ota_update)
+    // 1. Fix lỗi namespace (cũ)
     pluginManager.withPlugin("com.android.library") {
         try {
             val android = extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)
@@ -28,10 +27,20 @@ subprojects {
                 }
             }
         } catch (e: Exception) {
-            // Bỏ qua nếu có lỗi nhỏ trong quá trình gán, để không chặn build
             println("Namespace fix skipped for ${project.name}")
         }
     }
+    // Ép buộc tất cả thư viện phải dùng androidx.core bản mới (1.12.0 trở lên)
+    project.configurations.all {
+        resolutionStrategy {
+            eachDependency {
+                if (requested.group == "androidx.core" && requested.name == "core") {
+                    useVersion("1.12.0")
+                }
+            }
+        }
+    }
+
     project.evaluationDependsOn(":app")
 }
 
