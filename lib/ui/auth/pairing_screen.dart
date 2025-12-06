@@ -135,7 +135,6 @@ class _PairingScreenState extends State<PairingScreen> {
               StreamBuilder<DatabaseEvent>(
                 stream: _currentCoupleId != null
                     ? auth.getCoupleStream(_currentCoupleId!)
-                          as Stream<DatabaseEvent>
                     : null,
                 builder: (context, snapshot) {
                   return const SizedBox.shrink();
