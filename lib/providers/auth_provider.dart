@@ -87,13 +87,19 @@ class AuthProvider with ChangeNotifier {
   Future<bool> joinPairingCode(String code) async {
     if (_user == null) return false;
     _setLoading(true);
+
+    // Log input nhận được từ UI
+    print('🔑 [AuthProvider] joinPairingCode called with: "$code"');
+
     String? cId = await _dbService.joinCouple(code, _user!.uid);
     if (cId != null) {
+      print('✅ [AuthProvider] Join success. CoupleID: $cId');
       await savePairingState(cId);
       _setLoading(false);
       return true;
     } else {
-      _errorMessage = "Failed to join. Check code or room status.";
+      print('❌ [AuthProvider] Join failed (DatabaseService returned null)');
+      _errorMessage = "Failed to join. Check code, room status, or internet.";
       _setLoading(false);
       return false;
     }

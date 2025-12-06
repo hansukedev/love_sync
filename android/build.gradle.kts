@@ -43,10 +43,20 @@ subprojects {
     project.configurations.all {
         resolutionStrategy {
             eachDependency {
-                if (requested.group == "androidx.core" && requested.name == "core") {
-                    useVersion("1.12.0")
+                if (requested.group == "androidx.core") {
+                    if (requested.name == "core" || requested.name == "core-ktx") {
+                        useVersion("1.13.1")
+                    }
                 }
             }
+        }
+    }
+
+    // Thuốc đặc trị lỗi setStylusHandwritingEnabled
+    configurations.all {
+        resolutionStrategy {
+            force("androidx.core:core-ktx:1.13.1")
+            force("androidx.core:core:1.13.1")
         }
     }
 
