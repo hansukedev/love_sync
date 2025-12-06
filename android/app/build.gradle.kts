@@ -10,7 +10,10 @@ plugins {
 
 android {
     namespace = "com.example.love_sync"
-    compileSdk = flutter.compileSdkVersion
+    
+    // 👇 SỬA Ở ĐÂY: Đổi từ flutter.compileSdkVersion thành 34
+    compileSdk = 34 
+    
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -28,7 +31,10 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        
+        // 👇 SỬA Ở ĐÂY: Đổi từ flutter.targetSdkVersion thành 34
+        targetSdk = 34
+        
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
