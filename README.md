@@ -44,6 +44,7 @@ Nếu bạn muốn tải mã nguồn về và chạy trên máy tính cá nhân:
 git clone [https://github.com/hansukedev/love_sync.git](https://github.com/hansukedev/love_sync.git)
 cd love_sync
 flutter pub get
+```
 ### 3. Cấu hình Firebase (Bắt buộc)
 Vì lý do bảo mật, các file cấu hình Firebase (`google-services.json`, `firebase_options.dart`) không được công khai trên GitHub. Bạn cần tạo project Firebase riêng:
 
@@ -60,6 +61,7 @@ Vì lý do bảo mật, các file cấu hình Firebase (`google-services.json`, 
 ### 4. Chạy ứng dụng
 ```bash
 flutter run
+```
 ## 📦 Tải Xuống (Download)
 
 Phiên bản mới nhất (APK) được build tự động thông qua GitHub Actions và có sẵn tại mục **Releases**.
