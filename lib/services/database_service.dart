@@ -58,11 +58,11 @@ class DatabaseService {
 
       if (snapshot.exists) {
         for (final child in snapshot.children) {
-          final data = child.value as Map; // Ép kiểu về Map để đọc dữ liệu
-
-          // Kiểm tra xem phòng đã full chưa (user2 phải là null mới cho vào)
-          if (data['user2'] == null) {
-            // Update user2 vào node đó
+          // Check if 'user2' is null (room is available) using child() accessor
+          // This avoids casting child.value to Map which can cause errors if value is not a Map
+          if (child.child('user2').exists == false ||
+              child.child('user2').value == null) {
+            // Update user2 into that node
             await child.ref.update({'user2': userId});
             return child.key; // Return coupleId
           } else {
