@@ -75,7 +75,17 @@ class AuthProvider with ChangeNotifier {
   Future<bool> signInAnonymously() async {
     _setLoading(true);
     try {
+      // CRITICAL FIX: Reset coupleId before logging in anonymously
+      _coupleId = null;
+      _roomStream = null;
+
       User? user = await _authService.signInAnonymously();
+
+      if (user != null) {
+        // Double check pairing status, but initially it should be null for fresh anon or cleared
+        await checkPairingStatus();
+      }
+
       _setLoading(false);
       return user != null;
     } catch (e) {

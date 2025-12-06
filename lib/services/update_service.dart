@@ -5,7 +5,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 
 class UpdateService {
@@ -15,26 +14,34 @@ class UpdateService {
   Future<void> checkUpdate(BuildContext context) async {
     try {
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
-      String currentVersion = packageInfo.version;
+      String currentVersion = packageInfo.version; // Ví dụ: 1.0.0
+
+      debugPrint("🔍 Đang kiểm tra update... (Current: $currentVersion)");
 
       final response = await http.get(Uri.parse(repoUrl));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         String latestTag = data['tag_name'];
-        String latestVersion = latestTag.replaceAll('v', '');
+        // Xử lý chuỗi version: Xóa chữ 'v', xóa khoảng trắng
+        String latestV = latestTag.replaceAll('v', '').trim();
+        String currentV = currentVersion.replaceAll('v', '').trim();
+
         String downloadUrl = data['assets'][0]['browser_download_url'];
 
-        // Debug log
-        debugPrint("Current: $currentVersion, Latest: $latestVersion");
+        debugPrint("📡 Check Version: Server($latestV) vs App($currentV)");
 
-        if (latestVersion != currentVersion) {
+        // So sánh version strict
+        if (latestV != currentV) {
+          debugPrint("🚀 Có bản mới! Hiển thị dialog...");
           if (context.mounted) {
             _showUpdateDialog(context, downloadUrl, latestTag);
           }
+        } else {
+          debugPrint("✅ App đang ở phiên bản mới nhất.");
         }
       }
     } catch (e) {
-      debugPrint("Lỗi check update: $e");
+      debugPrint("❌ Lỗi check update: $e");
     }
   }
 
@@ -43,19 +50,21 @@ class UpdateService {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text("Có bản cập nhật mới! ($version)"),
-        content: Text("Bấm cập nhật để tải về và cài đặt."),
+        title: Text("Cập nhật Love Sync $version"),
+        content: const Text(
+          "Phiên bản mới đã sẵn sàng. Tải ngay để fix lỗi và thêm tính năng mới!",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Để sau"),
+            child: const Text("Để sau"),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               _downloadAndInstall(context, url);
             },
-            child: Text("Cập nhật ngay"),
+            child: const Text("Cập nhật ngay"),
           ),
         ],
       ),
@@ -63,48 +72,50 @@ class UpdateService {
   }
 
   Future<void> _downloadAndInstall(BuildContext context, String url) async {
-    // 1. Xin quyền (Chủ yếu cho Android < 10)
-    var status = await Permission.storage.request();
-    if (status.isDenied) {
-      debugPrint("Không có quyền ghi file");
-      return;
-    }
+    // 1. Không cần xin quyền Storage nếu dùng cache directory (Android 11+ safe)
 
-    // Hiển thị loading (đơn giản)
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Đang tải bản cập nhật... Vui lòng đợi.")),
+        const SnackBar(
+          content: Text("🚀 Đang tải bản cập nhật... Vui lòng không tắt app."),
+          duration: Duration(seconds: 10),
+        ),
       );
     }
 
     try {
       // 2. Xác định đường dẫn lưu file
-      // Dùng getExternalCacheDirectories an toàn hơn cho việc cài đặt
-      Directory? tempDir = await getExternalStorageDirectory();
-      // Nếu null thì fallback về temporary
-      tempDir ??= await getTemporaryDirectory();
+      // FIX: Dùng getApplicationCacheDirectory để tránh lỗi Permission Denied trên Android mới
+      // getExternalCacheDirectory ưu tiên thẻ nhớ ngoài, getApplicationCacheDirectory ưu tiên bộ nhớ trong
+      final Directory cacheDir = await getApplicationCacheDirectory();
+      String savePath = "${cacheDir.path}/love_sync_update.apk";
 
-      String savePath = "${tempDir.path}/love_sync_update.apk";
+      debugPrint("📂 Lưu file tại: $savePath");
+
+      // Xóa file cũ nếu có
+      final file = File(savePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
 
       // 3. Tải file bằng Dio
+      debugPrint("🚀 Bắt đầu tải...");
       await Dio().download(
         url,
         savePath,
         onReceiveProgress: (received, total) {
           if (total != -1) {
-            debugPrint(
-              "Download: ${(received / total * 100).toStringAsFixed(0)}%",
-            );
-            // Bạn có thể update UI progress bar ở đây nếu muốn
+            String percent = (received / total * 100).toStringAsFixed(0);
+            debugPrint("📦 Download: $percent% ($received/$total)");
           }
         },
       );
 
-      debugPrint("Tải xong: $savePath");
+      debugPrint("✅ Tải xong! Đang mở file...");
 
-      // 4. Mở file để cài đặt
+      // 4. Mở file cài đặt
       final result = await OpenFile.open(savePath);
-      debugPrint("Open result: ${result.type} - ${result.message}");
+      debugPrint("📦 Kết quả cài đặt: ${result.type} - ${result.message}");
 
       if (result.type != ResultType.done) {
         if (context.mounted) {
@@ -114,11 +125,11 @@ class UpdateService {
         }
       }
     } catch (e) {
-      debugPrint("Lỗi download/install: $e");
+      debugPrint("❌ Lỗi download/install: $e");
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text("Lỗi: $e")));
+        ).showSnackBar(SnackBar(content: Text("Lỗi tải: $e")));
       }
     }
   }

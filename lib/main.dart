@@ -8,6 +8,7 @@ import 'providers/auth_provider.dart';
 import 'providers/mood_provider.dart';
 import 'ui/auth/login_screen.dart';
 import 'ui/home/home_screen.dart';
+import 'ui/auth/pairing_screen.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -37,25 +38,28 @@ class MyApp extends StatelessWidget {
         title: 'Love Sync',
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false, // Tắt cái banner Debug cho đẹp
-        // 👇 LOGIC ĐIỀU HƯỚNG TỰ ĐỘNG (Sửa lại cho chắc chắn chạy)
+        // 👇 LOGIC ĐIỀU HƯỚNG TỰ ĐỘNG
         home: Consumer<AuthProvider>(
           builder: (context, auth, _) {
-            // 1. Kiểm tra xem AuthProvider có biến isLoading không
-            // Nếu AuthProvider của ông chưa có biến này, ông xóa dòng if này đi
+            // 1. Loading
             if (auth.isLoading) {
               return const Scaffold(
                 body: Center(child: CircularProgressIndicator()),
               );
             }
 
-            // 2. Kiểm tra user đã đăng nhập chưa
-            // Lưu ý: auth.user phải là getter trả về User? trong AuthProvider
-            if (auth.user != null) {
-              return const HomeScreen();
+            // 2. Chưa login -> Login
+            if (auth.user == null) {
+              return const LoginScreen();
             }
 
-            // 3. Nếu chưa -> Về Login
-            return const LoginScreen();
+            // 3. Đã login nhưng CHƯA có coupleId -> Màn hình ghép đôi
+            if (auth.coupleId == null) {
+              return const PairingScreen();
+            }
+
+            // 4. Đã login và có coupleId -> Vào nhà
+            return const HomeScreen();
           },
         ),
 
