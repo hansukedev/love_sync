@@ -20,7 +20,7 @@ dependencies:
   google_sign_in: ^6.2.1
   http: ^1.2.2
   package_info_plus: ^9.0.0
-  ota_update: ^5.1.0
+  r_upgrade: ^0.4.2
 
 
 dev_dependencies:

@@ -1,3 +1,4 @@
+
 allprojects {
     repositories {
         google()
@@ -17,20 +18,28 @@ subprojects {
 }
 
 subprojects {
-    // 1. Fix lỗi namespace (cũ)
+
     pluginManager.withPlugin("com.android.library") {
         try {
             val android = extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)
             if (android != null) {
+                // 1. Fix lỗi namespace (cho các lib cũ chưa khai báo)
                 if (android.namespace == null) {
                     android.namespace = project.group.toString()
                 }
+
+                // 2. Fix lỗi lStar not found
+                // Ép thư viện con (ota_update) phải biên dịch bằng SDK 34 mới hiểu được lStar
+                android.compileSdk = 34
+                android.defaultConfig.targetSdk = 34
             }
         } catch (e: Exception) {
-            println("Namespace fix skipped for ${project.name}")
+            println("Skipping build config fix for ${project.name}")
         }
     }
-    // Ép buộc tất cả thư viện phải dùng androidx.core bản mới (1.12.0 trở lên)
+
+
+    // Ép dùng bản core mới nhất (để chắc ăn 100%)
     project.configurations.all {
         resolutionStrategy {
             eachDependency {
