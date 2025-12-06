@@ -80,7 +80,7 @@ class DatabaseService {
 
   // Listen to a couple node (để biết khi nào user2 nhảy vào)
   Stream<DatabaseEvent> getCoupleStream(String coupleId) {
-    return _dbRef.child('couples/$coupleId').onValue;
+    return _dbRef.child('couples/$coupleId').onValue.asBroadcastStream();
   }
 
   // Create user info

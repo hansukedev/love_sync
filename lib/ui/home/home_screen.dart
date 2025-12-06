@@ -3,9 +3,28 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../auth/login_screen.dart';
+import '../../services/update_service.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 👇 Kích hoạt kiểm tra cập nhật ngay khi vào màn hình chính
+    // Đợi 1 xíu (2s) để giao diện load xong rồi mới hiện popup cho mượt
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        // Kiểm tra xem màn hình còn đó không
+        UpdateService().checkUpdate(context);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
