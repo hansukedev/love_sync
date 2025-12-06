@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:firebase_core/firebase_core.dart'; // <--- NHỚ THÊM DÒNG NÀY
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 
 class DatabaseService {
@@ -45,9 +46,16 @@ class DatabaseService {
 
   // Join an existing couple
   // Returns coupleId if successful, null otherwise
-  Future<String?> joinCouple(String code, String userId) async {
+  Future<String?> joinCouple(String codeRaw, String userId) async {
+    // 1. Chuẩn hóa input: Xóa khoảng trắng, uppercase
+    final String code = codeRaw.trim().toUpperCase();
+    debugPrint(
+      '⚡ [JoinRoom] Attempting to join with code: "$code" (Raw: "$codeRaw")',
+    );
+
     try {
-      // Query tìm node nào có 'code' bằng với code nhập vào
+      // 2. Query tìm node nào có 'code' bằng với code nhập vào
+      // IMPORTANT: Cần chắc chắn Firebase Rules đã có ".indexOn": ["code"]
       final query = _dbRef
           .child('couples')
           .orderByChild('code')
@@ -56,24 +64,37 @@ class DatabaseService {
 
       final snapshot = await query.get();
 
+      debugPrint('⚡ [JoinRoom] Snapshot exists: ${snapshot.exists}');
+
       if (snapshot.exists) {
+        // Snapshot trả về là một Map<key, value>, ta cần iterate qua nó
         for (final child in snapshot.children) {
-          // Check if 'user2' is null (room is available) using child() accessor
-          // This avoids casting child.value to Map which can cause errors if value is not a Map
-          if (child.child('user2').exists == false ||
-              child.child('user2').value == null) {
-            // Update user2 into that node
-            await child.ref.update({'user2': userId});
-            return child.key; // Return coupleId
-          } else {
-            print('Room is full (Đã có người yêu rồi ông ơi!)');
-            return null;
+          debugPrint('⚡ [JoinRoom] Found room: ${child.key}');
+
+          final data = child.value;
+          // Check data an toàn
+          if (data is Map) {
+            final user2 = data['user2'];
+            debugPrint('⚡ [JoinRoom] Current user2: $user2');
+
+            if (user2 == null || (user2 is String && user2.isEmpty)) {
+              // Room còn trống -> Update user2
+              await child.ref.update({'user2': userId});
+              debugPrint('✅ [JoinRoom] Success! Joined room ${child.key}');
+              return child.key;
+            } else {
+              debugPrint('❌ [JoinRoom] Room is full (User2 already exists)');
+              // Có thể return một mã lỗi đặc biệt nếu muốn handle UI kỹ hơn
+              return null;
+            }
           }
         }
+      } else {
+        debugPrint('❌ [JoinRoom] No room found with code: $code');
       }
-      return null; // Không tìm thấy code
+      return null; // Không tìm thấy hoặc full
     } catch (e) {
-      print('Join Couple Error: $e');
+      debugPrint('🔥 [JoinRoom] Error: $e');
       return null;
     }
   }
