@@ -46,16 +46,25 @@ class DatabaseService {
 
   // Join an existing couple
   // Returns coupleId if successful, null otherwise
+  // Join an existing couple - HEAVY DEBUG VERSION
   Future<String?> joinCouple(String codeRaw, String userId) async {
-    // 1. Chuẩn hóa input: Xóa khoảng trắng, uppercase
+    // 0. Sanitize Input
     final String code = codeRaw.trim().toUpperCase();
-    debugPrint(
-      '⚡ [JoinRoom] Attempting to join with code: "$code" (Raw: "$codeRaw")',
-    );
+    debugPrint('\n================ [JOIN ROOM START] ================');
+    debugPrint('⚡ [1] User ID: $userId');
+    debugPrint('⚡ [2] Input Code: "$code" (Original: "$codeRaw")');
+
+    if (userId.isEmpty) {
+      debugPrint('❌ ERROR: User ID is empty! Cannot join.');
+      return null;
+    }
 
     try {
-      // 2. Query tìm node nào có 'code' bằng với code nhập vào
-      // IMPORTANT: Cần chắc chắn Firebase Rules đã có ".indexOn": ["code"]
+      // 3. Construct Query
+      debugPrint(
+        '⚡ [3] Querying "couples" ordered by "code" equal to "$code"...',
+      );
+
       final query = _dbRef
           .child('couples')
           .orderByChild('code')
@@ -64,39 +73,66 @@ class DatabaseService {
 
       final snapshot = await query.get();
 
-      debugPrint('⚡ [JoinRoom] Snapshot exists: ${snapshot.exists}');
+      // 4. Analyze Snapshot
+      debugPrint('⚡ [4] Query Result - Exists: ${snapshot.exists}');
 
       if (snapshot.exists) {
-        // Snapshot trả về là một Map<key, value>, ta cần iterate qua nó
+        debugPrint('📦 [RAW DATA]: ${snapshot.value}');
+        debugPrint('📦 [DATA TYPE]: ${snapshot.value.runtimeType}');
+
+        // 5. Iterate & Safe Cast
         for (final child in snapshot.children) {
-          debugPrint('⚡ [JoinRoom] Found room: ${child.key}');
+          debugPrint('   👉 Found Child Key: ${child.key}');
 
-          final data = child.value;
-          // Check data an toàn
-          if (data is Map) {
+          final dynamic childValue = child.value;
+
+          if (childValue is Map) {
+            // Safe Map Casting
+            // Note: Firebase Realtime DB returns Map<Object?, Object?> usually
+            final Map<dynamic, dynamic> data = childValue;
+
             final user2 = data['user2'];
-            debugPrint('⚡ [JoinRoom] Current user2: $user2');
+            final status = data['status'];
 
+            debugPrint('      - user2: $user2 (${user2.runtimeType})');
+            debugPrint('      - status: $status');
+
+            // 6. Check Availability
             if (user2 == null || (user2 is String && user2.isEmpty)) {
-              // Room còn trống -> Update user2
-              await child.ref.update({'user2': userId});
-              debugPrint('✅ [JoinRoom] Success! Joined room ${child.key}');
+              // 7. Update DB
+              debugPrint(
+                '      ✅ [Action] Room is available. Updating user2...',
+              );
+              await child.ref.update({
+                'user2': userId,
+                'status': 'paired', // Optional: update status if used
+                'joinedAt': ServerValue.timestamp,
+              });
+
+              debugPrint('✅ [SUCCESS] Joined Room ID: ${child.key}');
+              debugPrint('================ [JOIN ROOM END] ================\n');
               return child.key;
             } else {
-              debugPrint('❌ [JoinRoom] Room is full (User2 already exists)');
-              // Có thể return một mã lỗi đặc biệt nếu muốn handle UI kỹ hơn
-              return null;
+              debugPrint('❌ [FAIL] Room is full. User2 is already: $user2');
             }
+          } else {
+            debugPrint(
+              '⚠️ [WARN] Child value is not a Map! It is: ${childValue.runtimeType}',
+            );
           }
         }
       } else {
-        debugPrint('❌ [JoinRoom] No room found with code: $code');
+        debugPrint(
+          '❌ [FAIL] No room found for code "$code". Check Firebase Console.',
+        );
       }
-      return null; // Không tìm thấy hoặc full
-    } catch (e) {
-      debugPrint('🔥 [JoinRoom] Error: $e');
-      return null;
+    } catch (e, stack) {
+      debugPrint('🔥 [EXCEPTION] Error in joinCouple: $e');
+      debugPrint('Stack trace: $stack');
     }
+
+    debugPrint('================ [JOIN ROOM END (FAILED)] ================\n');
+    return null;
   }
 
   // Listen to a couple node (để biết khi nào user2 nhảy vào)
