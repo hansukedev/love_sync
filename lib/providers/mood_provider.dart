@@ -72,7 +72,7 @@ class MoodProvider with ChangeNotifier {
       data.forEach((key, value) {
         if (value is Map) {
           final moodCode = value['code'] as String?;
-          final moodDesc = value['description'] as String?;
+          final moodDesc = value['description']?.toString();
 
           if (key == userId) {
             newMyMood = moodCode;
@@ -185,10 +185,14 @@ class MoodProvider with ChangeNotifier {
 
   // --- Decision Tournament Methods ---
   String? _decisionResult;
+  String? _decisionStatus;
+  String? _decisionReason;
   DateTime? _decisionTime;
   StreamSubscription<DatabaseEvent>? _decisionSub;
 
   String? get currentValidDecision {
+    if (_decisionStatus == 'rejected')
+      return null; // Don't show winner if rejected
     if (_decisionResult == null || _decisionTime == null) return null;
 
     // TTL Check: Chỉ hiện trong 3 tiếng
@@ -199,20 +203,36 @@ class MoodProvider with ChangeNotifier {
     return _decisionResult;
   }
 
+  bool get isRejected {
+    if (_decisionStatus != 'rejected') return false;
+    if (_decisionTime == null) return false;
+    // Hide rejection after 3 hours too
+    final now = DateTime.now();
+    return now.difference(_decisionTime!).inHours < 3;
+  }
+
+  String? get decisionReason => _decisionReason;
+
   void _listenToDecisions(String coupleId) {
-    _decisionSub = _dbService.getDecisionStream(coupleId).listen((event) {
+    _decisionSub = _dbService.listenToDecisionResult(coupleId).listen((event) {
       if (event.snapshot.value == null) {
         _decisionResult = null;
+        _decisionStatus = null;
+        _decisionReason = null;
         _decisionTime = null;
         notifyListeners();
         return;
       }
       final data = event.snapshot.value as Map;
       final winner = data['winner'] as String?;
+      final status = data['status'] as String?;
+      final reason = data['reason'] as String?;
       final timestamp = data['timestamp'] as int?;
 
-      if (winner != null && timestamp != null) {
+      if (timestamp != null) {
         _decisionResult = winner;
+        _decisionStatus = status;
+        _decisionReason = reason;
         _decisionTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
         notifyListeners();
       }

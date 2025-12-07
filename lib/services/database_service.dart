@@ -232,11 +232,8 @@ class DatabaseService {
         'timestamp': ServerValue.timestamp,
       });
 
-      // Clear request logic if needed, but keeping history or clearing request might be good.
-      // For now, let's update status of request to completed to hide it.
-      await _dbRef
-          .child('couples/$coupleId/decision_request/status')
-          .set('completed');
+      // Clear request logic: Remove the request node so listeners stop firing
+      await _dbRef.child('couples/$coupleId/decision_request').remove();
 
       // Also update the main decision node for dashboard display if accepted
       if (status == 'accepted' && winner != null) {

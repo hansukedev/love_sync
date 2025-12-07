@@ -423,6 +423,37 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
 
+                if (mood.isRejected)
+                  Container(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.redAccent),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.cancel, color: Colors.red),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            "Phản đối: ${mood.decisionReason ?? 'Không rõ lý do'}",
+                            style: GoogleFonts.nunito(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red[800],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // 3. MOOD AREA
                 MoodSection(auth: auth, mood: mood),
 
