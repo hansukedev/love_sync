@@ -38,6 +38,18 @@ class LoginScreen extends StatelessWidget {
               ),
             ),
           ),
+          Positioned(
+            bottom: -50,
+            left: -50,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                color: Colors.pink.withOpacity(0.03),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
 
           // 3. Central Glass Card
           Center(
@@ -95,7 +107,7 @@ class LoginScreen extends StatelessWidget {
                       if (authProvider.isLoading)
                         const CircularProgressIndicator(color: Colors.black87)
                       else ...[
-                        // Google Login Button (Đã sửa logic bắt lỗi)
+                        // Google Login Button (Đã sửa logic bắt lỗi hiển thị Dialog)
                         Container(
                           decoration: BoxDecoration(
                             boxShadow: [
@@ -111,27 +123,36 @@ class LoginScreen extends StatelessWidget {
                               try {
                                 bool success = await authProvider
                                     .signInWithGoogle();
-                                // Nếu thành công: KHÔNG CẦN LÀM GÌ CẢ
-                                // main.dart (StreamBuilder) sẽ tự động chuyển trang
 
+                                // NẾU THÀNH CÔNG: KHÔNG LÀM GÌ CẢ.
+                                // StreamBuilder ở main.dart sẽ tự chuyển trang.
+
+                                // NẾU THẤT BẠI: Hiện lỗi
                                 if (!success && context.mounted) {
-                                  // Nếu thất bại mà không văng Exception
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
+                                  // Hiển thị dialog lỗi rõ ràng để debug SHA-1
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text("Đăng nhập thất bại"),
                                       content: Text(
-                                        "Lỗi: ${authProvider.errorMessage ?? 'Đăng nhập thất bại'}",
+                                        "Lỗi: ${authProvider.errorMessage ?? 'Không xác định'}\n\n(Nếu là bản Release, hãy kiểm tra SHA-1 trong Firebase)",
                                       ),
-                                      backgroundColor: Colors.red,
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          child: const Text("OK"),
+                                        ),
+                                      ],
                                     ),
                                   );
                                 }
                               } catch (e) {
-                                // Bắt lỗi SHA-1 hoặc cấu hình sai tại đây
+                                // Bắt Exception (Thường là lỗi 10 hoặc 12500)
                                 if (context.mounted) {
                                   showDialog(
                                     context: context,
                                     builder: (ctx) => AlertDialog(
-                                      title: const Text("Đăng nhập lỗi"),
+                                      title: const Text("Lỗi Google Sign-In"),
                                       content: Text("Chi tiết: $e"),
                                       actions: [
                                         TextButton(
