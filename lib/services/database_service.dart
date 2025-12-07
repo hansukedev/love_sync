@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:math';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 
@@ -116,6 +118,184 @@ class DatabaseService {
       await _dbRef.child('users/${user.id}').set(user.toMap());
     } catch (e) {
       debugPrint('Create User Error: $e');
+    }
+  }
+
+  // --- Mood Sync Methods ---
+
+  // Cập nhật Mood lên DB
+  Future<void> updateMood(
+    String coupleId,
+    String userId,
+    String moodCode,
+    String description,
+  ) async {
+    try {
+      await _dbRef.child('couples/$coupleId/mood/$userId').set({
+        'code': moodCode,
+        'description': description,
+        'updatedAt': ServerValue.timestamp,
+      });
+    } catch (e) {
+      debugPrint('Update Mood Error: $e');
+    }
+  }
+
+  // Lắng nghe thay đổi Mood của cả 2
+  Stream<DatabaseEvent> getMoodStream(String coupleId) {
+    return _dbRef.child('couples/$coupleId/mood').onValue;
+  }
+
+  // --- Love Touch Methods ---
+
+  // Gửi tín hiệu rung (Love Touch)
+  Future<void> sendTouch(String coupleId, String userId) async {
+    try {
+      await _dbRef.child('couples/$coupleId/touch/$userId').set({
+        'timestamp': ServerValue.timestamp,
+      });
+    } catch (e) {
+      debugPrint('Send Touch Error: $e');
+    }
+  }
+
+  // Lắng nghe tín hiệu rung
+  Stream<DatabaseEvent> getTouchStream(String coupleId) {
+    return _dbRef.child('couples/$coupleId/touch').onValue;
+  }
+
+  // --- Anniversary Methods ---
+
+  // Cập nhật ngày bắt đầu yêu
+  Future<void> updateStartDate(String coupleId, int timestamp) async {
+    try {
+      await _dbRef.child('couples/$coupleId/startDate').set(timestamp);
+    } catch (e) {
+      debugPrint('Update StartDate Error: $e');
+    }
+  }
+
+  // Lắng nghe ngày bắt đầu yêu
+  Stream<DatabaseEvent> getStartDateStream(String coupleId) {
+    return _dbRef.child('couples/$coupleId/startDate').onValue;
+  }
+
+  // --- Decision Tournament Methods ---
+
+  // Cập nhật kết quả quyết định
+  Future<void> updateDecision(String coupleId, String result) async {
+    try {
+      await _dbRef.child('couples/$coupleId/decision').set({
+        'winner': result,
+        'timestamp': ServerValue.timestamp,
+      });
+    } catch (e) {
+      debugPrint('Update Decision Error: $e');
+    }
+  }
+
+  // Lắng nghe kết quả quyết định
+  Stream<DatabaseEvent> getDecisionStream(String coupleId) {
+    return _dbRef.child('couples/$coupleId/decision').onValue;
+  }
+
+  // --- New Decision Tournament (Request/Response) ---
+
+  Future<void> sendDecisionRequest(
+    String coupleId,
+    String senderId,
+    List<String> options,
+  ) async {
+    try {
+      await _dbRef.child('couples/$coupleId/decision_request').set({
+        'senderId': senderId,
+        'options': options,
+        'timestamp': ServerValue.timestamp,
+        'status': 'pending',
+      });
+    } catch (e) {
+      debugPrint('Send Decision Request Error: $e');
+    }
+  }
+
+  Future<void> respondToDecision(
+    String coupleId, {
+    String? winner,
+    String? reason,
+    required String status,
+  }) async {
+    try {
+      await _dbRef.child('couples/$coupleId/decision_result').set({
+        'winner': winner,
+        'reason': reason,
+        'status': status,
+        'timestamp': ServerValue.timestamp,
+      });
+
+      // Clear request logic if needed, but keeping history or clearing request might be good.
+      // For now, let's update status of request to completed to hide it.
+      await _dbRef
+          .child('couples/$coupleId/decision_request/status')
+          .set('completed');
+
+      // Also update the main decision node for dashboard display if accepted
+      if (status == 'accepted' && winner != null) {
+        updateDecision(coupleId, winner);
+      }
+    } catch (e) {
+      debugPrint('Respond Decision Error: $e');
+    }
+  }
+
+  Stream<DatabaseEvent> listenToDecisionRequest(String coupleId) {
+    return _dbRef.child('couples/$coupleId/decision_request').onValue;
+  }
+
+  Stream<DatabaseEvent> listenToDecisionResult(String coupleId) {
+    return _dbRef.child('couples/$coupleId/decision_result').onValue;
+  }
+
+  // --- Secure Chat Methods ---
+
+  Future<void> sendMessage(
+    String coupleId,
+    String senderId,
+    String text, {
+    String? imageUrl,
+  }) async {
+    try {
+      await _dbRef.child('couples/$coupleId/messages').push().set({
+        'senderId': senderId,
+        'text': text,
+        'imageUrl': imageUrl,
+        'timestamp': ServerValue.timestamp,
+      });
+    } catch (e) {
+      debugPrint('Send Message Error: $e');
+    }
+  }
+
+  Stream<DatabaseEvent> getChatStream(String coupleId) {
+    // Limit to last 50 messages for performance
+    return _dbRef
+        .child('couples/$coupleId/messages')
+        .orderByChild('timestamp')
+        .limitToLast(50)
+        .onValue;
+  }
+
+  Future<String?> uploadImage(File file) async {
+    try {
+      String fileName = DateTime.now().millisecondsSinceEpoch.toString();
+      Reference ref = FirebaseStorage.instance.ref().child(
+        'chat_images/$fileName.jpg',
+      );
+      UploadTask uploadTask = ref.putFile(file);
+      TaskSnapshot snapshot = await uploadTask;
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      debugPrint('Upload Image Error: $e');
+      return null;
     }
   }
 }
