@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:love_sync/l10n/app_localizations.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/mood_provider.dart';
 
@@ -11,6 +12,7 @@ class AnniversaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: () async {
         if (auth.coupleId == null) return;
@@ -46,12 +48,12 @@ class AnniversaryCard extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              "Chúng mình bên nhau",
+              l10n.weHaveBeenTogether,
               style: GoogleFonts.nunito(fontSize: 18, color: Colors.white70),
             ),
             const SizedBox(height: 10),
             Text(
-              "${mood.daysTogether} Ngày",
+              l10n.daysCount(mood.daysTogether),
               style: GoogleFonts.nunito(
                 fontSize: 40,
                 fontWeight: FontWeight.bold,
@@ -60,12 +62,14 @@ class AnniversaryCard extends StatelessWidget {
             ),
             if (mood.startDate != null)
               Text(
-                "Kể từ: ${mood.startDate!.day}/${mood.startDate!.month}/${mood.startDate!.year}",
+                l10n.sinceDate(
+                  "${mood.startDate!.day}/${mood.startDate!.month}/${mood.startDate!.year}",
+                ),
                 style: GoogleFonts.nunito(fontSize: 14, color: Colors.white70),
               )
             else
               Text(
-                "Chạm để chọn ngày",
+                l10n.tapToPickDate,
                 style: GoogleFonts.nunito(fontSize: 14, color: Colors.white70),
               ),
           ],

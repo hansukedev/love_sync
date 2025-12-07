@@ -1,31 +1,102 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:love_sync/l10n/app_localizations.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/mood_provider.dart';
 
-class MoodSection extends StatelessWidget {
+class MoodSection extends StatefulWidget {
   final AuthProvider auth;
   final MoodProvider mood;
 
   const MoodSection({super.key, required this.auth, required this.mood});
 
   @override
+  State<MoodSection> createState() => _MoodSectionState();
+}
+
+class _MoodSectionState extends State<MoodSection> {
+  String? _selectedMood;
+  late TextEditingController _descController;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with current values from Provider
+    _selectedMood = widget.mood.myMood;
+    _descController = TextEditingController(text: widget.mood.myMoodDesc ?? "");
+  }
+
+  @override
+  void dispose() {
+    _descController.dispose();
+    super.dispose();
+  }
+
+  // Update local state when Provider data changes (sync from remote initially)
+  @override
+  void didUpdateWidget(covariant MoodSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.mood.myMood != oldWidget.mood.myMood &&
+        widget.mood.myMood != _selectedMood) {
+      if (_selectedMood == null) {
+        // Only update if local is null (first load), don't overwrite user changes
+        setState(() {
+          _selectedMood = widget.mood.myMood;
+          _descController.text = widget.mood.myMoodDesc ?? "";
+        });
+      }
+    }
+  }
+
+  Future<void> _submitMood() async {
+    final l10n = AppLocalizations.of(context)!;
+    if (widget.auth.coupleId == null ||
+        widget.auth.user == null ||
+        _selectedMood == null) {
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    await widget.mood.setMood(
+      widget.auth.coupleId!,
+      widget.auth.user!.uid,
+      _selectedMood!,
+      _descController.text.trim(),
+    );
+
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.moodUpdated),
+          backgroundColor: Colors.pinkAccent,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         // --- 1. PARTNER MOOD AREA ---
-        if (mood.partnerMood != null) ...[
-          _buildMoodIcon(mood.partnerMood!, size: 100),
+        if (widget.mood.partnerMood != null) ...[
+          _buildMoodIcon(widget.mood.partnerMood!, size: 100),
           const SizedBox(height: 16),
           Text(
-            "Người ấy đang cảm thấy...",
+            l10n.partnerIsFeeling,
             style: GoogleFonts.nunito(fontSize: 18, color: Colors.grey),
           ),
-          if (mood.partnerMoodDesc != null && mood.partnerMoodDesc!.isNotEmpty)
+          if (widget.mood.partnerMoodDesc != null &&
+              widget.mood.partnerMoodDesc!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8.0, left: 30, right: 30),
               child: Text(
-                '"${mood.partnerMoodDesc}"',
+                '"${widget.mood.partnerMoodDesc}"',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 20,
@@ -39,7 +110,7 @@ class MoodSection extends StatelessWidget {
           const Icon(Icons.favorite, size: 100, color: Colors.pink),
           const SizedBox(height: 16),
           Text(
-            "You are Paired!",
+            l10n.youArePaired,
             style: GoogleFonts.nunito(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -59,7 +130,7 @@ class MoodSection extends StatelessWidget {
 
         // --- 3. MY MOOD SELECTOR ---
         Text(
-          "Hôm nay bạn thế nào?",
+          l10n.howAreYouToday,
           style: GoogleFonts.nunito(fontSize: 16, color: Colors.black54),
         ),
         const SizedBox(height: 16),
@@ -95,8 +166,9 @@ class MoodSection extends StatelessWidget {
         ),
 
         // Description Input (Chỉ hiện khi đã chọn mood)
-        if (mood.myMood != null) ...[
+        if (_selectedMood != null) ...[
           const SizedBox(height: 16),
+          // Input Field
           Container(
             width: 250,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -105,24 +177,48 @@ class MoodSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: TextField(
-              decoration: const InputDecoration(
-                hintText: "Tại sao bạn cảm thấy vậy?",
+              controller: _descController,
+              decoration: InputDecoration(
+                hintText: l10n.whyDoYouFeelThisWay,
                 border: InputBorder.none,
-                icon: Icon(Icons.edit, size: 16, color: Colors.grey),
+                icon: const Icon(Icons.edit, size: 16, color: Colors.grey),
               ),
               style: GoogleFonts.nunito(fontSize: 14),
-              onSubmitted: (value) {
-                if (auth.coupleId != null &&
-                    auth.user != null &&
-                    mood.myMood != null) {
-                  mood.setMood(
-                    auth.coupleId!,
-                    auth.user!.uid,
-                    mood.myMood!,
-                    value,
-                  );
-                }
-              },
+              // NO onSubmitted here, only button triggers update
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Submit Button
+          SizedBox(
+            width: 200,
+            child: ElevatedButton.icon(
+              onPressed: _isSubmitting ? null : _submitMood,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.pinkAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.send, size: 20, color: Colors.white),
+              label: Text(
+                _isSubmitting ? l10n.sending : l10n.updateMood,
+                style: GoogleFonts.nunito(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
         ],
@@ -136,16 +232,15 @@ class MoodSection extends StatelessWidget {
     IconData icon,
     Color color,
   ) {
-    final isSelected = mood.myMood == code;
+    final isSelected = _selectedMood == code;
 
     return GestureDetector(
       onTap: () {
-        if (auth.coupleId != null && auth.user != null) {
-          // Khi nhấn icon, gửi mood với description rỗng hoặc giữ nguyên cái cũ (ở đây chọn gửi rỗng để reset)
-          // Hoặc có thể lưu state local của textField.
-          // Đơn giản nhất: gửi "" description khi mới chọn icon.
-          mood.setMood(auth.coupleId!, auth.user!.uid, code, "");
-        }
+        setState(() {
+          _selectedMood = code;
+          // Optionally reset description or keep it?
+          // Keeping it is usually better UX if they just change icons.
+        });
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

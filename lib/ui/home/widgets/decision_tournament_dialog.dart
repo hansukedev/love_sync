@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:love_sync/l10n/app_localizations.dart';
 
 class DecisionTournamentDialog extends StatefulWidget {
   final Function(List<String>) onSendRequest;
@@ -38,6 +39,7 @@ class _DecisionTournamentDialogState extends State<DecisionTournamentDialog> {
   }
 
   void _sendRequest() {
+    final l10n = AppLocalizations.of(context)!;
     // Validate inputs
     final validOptions = _controllers
         .map((c) => c.text.trim())
@@ -47,7 +49,7 @@ class _DecisionTournamentDialogState extends State<DecisionTournamentDialog> {
     if (validOptions.length < 2) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text("Cần ít nhất 2 lựa chọn!")));
+      ).showSnackBar(SnackBar(content: Text(l10n.needAtLeastTwoOptions)));
       return;
     }
 
@@ -68,12 +70,13 @@ class _DecisionTournamentDialogState extends State<DecisionTournamentDialog> {
   }
 
   Widget _buildInputView() {
+    final l10n = AppLocalizations.of(context)!;
     return SingleChildScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            "Tạo Giải Đấu",
+            l10n.createTournament,
             style: GoogleFonts.nunito(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -81,7 +84,7 @@ class _DecisionTournamentDialogState extends State<DecisionTournamentDialog> {
           ),
           const SizedBox(height: 10),
           Text(
-            "Nhập các lựa chọn để gửi cho người ấy chọn!",
+            l10n.enterOptionsForPartner,
             style: GoogleFonts.nunito(color: Colors.grey),
             textAlign: TextAlign.center,
           ),
@@ -91,7 +94,7 @@ class _DecisionTournamentDialogState extends State<DecisionTournamentDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text("Số lượng: "),
+              Text(l10n.quantity),
               DropdownButton<int>(
                 value: _optionCount,
                 items: [2, 4, 8]
@@ -117,7 +120,7 @@ class _DecisionTournamentDialogState extends State<DecisionTournamentDialog> {
               child: TextField(
                 controller: _controllers[index],
                 decoration: InputDecoration(
-                  labelText: "Lựa chọn ${index + 1}",
+                  labelText: l10n.optionIndex(index + 1),
                   border: const OutlineInputBorder(),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -135,9 +138,9 @@ class _DecisionTournamentDialogState extends State<DecisionTournamentDialog> {
               backgroundColor: Colors.pinkAccent,
               padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
             ),
-            child: const Text(
-              "Gửi đi!",
-              style: TextStyle(color: Colors.white, fontSize: 16),
+            child: Text(
+              l10n.send,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
         ],

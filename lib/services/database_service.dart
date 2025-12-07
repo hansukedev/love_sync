@@ -146,23 +146,17 @@ class DatabaseService {
     return _dbRef.child('couples/$coupleId/mood').onValue;
   }
 
-  // --- Love Touch Methods ---
+  // --- Love Touch Methods (Removed) ---
 
-  // Gửi tín hiệu rung (Love Touch)
+  /*
   Future<void> sendTouch(String coupleId, String userId) async {
-    try {
-      await _dbRef.child('couples/$coupleId/touch/$userId').set({
-        'timestamp': ServerValue.timestamp,
-      });
-    } catch (e) {
-      debugPrint('Send Touch Error: $e');
-    }
+      // ... removed ...
   }
-
-  // Lắng nghe tín hiệu rung
+  
   Stream<DatabaseEvent> getTouchStream(String coupleId) {
     return _dbRef.child('couples/$coupleId/touch').onValue;
   }
+  */
 
   // --- Anniversary Methods ---
 
@@ -225,15 +219,19 @@ class DatabaseService {
     required String status,
   }) async {
     try {
-      await _dbRef.child('couples/$coupleId/decision_result').set({
-        'winner': winner,
-        'reason': reason,
-        'status': status,
-        'timestamp': ServerValue.timestamp,
-      });
+      // Use atomic update to Write Result AND Delete Request simultaneously
+      // This prevents the "Infinite Dialog" bug where the listener still sees the request
+      final updates = <String, dynamic>{
+        'couples/$coupleId/decision_result': {
+          'winner': winner,
+          'reason': reason,
+          'status': status,
+          'timestamp': ServerValue.timestamp,
+        },
+        'couples/$coupleId/decision_request': null, // Atomic delete
+      };
 
-      // Clear request logic: Remove the request node so listeners stop firing
-      await _dbRef.child('couples/$coupleId/decision_request').remove();
+      await _dbRef.update(updates);
 
       // Also update the main decision node for dashboard display if accepted
       if (status == 'accepted' && winner != null) {
@@ -293,6 +291,29 @@ class DatabaseService {
     } catch (e) {
       debugPrint('Upload Image Error: $e');
       return null;
+    }
+  }
+  // --- Settings Methods ---
+
+  // Cập nhật tên hiển thị
+  Future<void> updateDisplayName(String userId, String name) async {
+    try {
+      await _dbRef.child('users/$userId/displayName').set(name);
+    } catch (e) {
+      debugPrint('Update Name Error: $e');
+    }
+  }
+
+  Future<void> unpairUser(String coupleId) async {
+    try {
+      // Reset về trạng thái chờ, xóa user2
+      await _dbRef.child('couples/$coupleId').update({
+        'user2': null,
+        'status': 'waiting',
+        'joinedAt': null,
+      });
+    } catch (e) {
+      debugPrint('Unpair Error: $e');
     }
   }
 }

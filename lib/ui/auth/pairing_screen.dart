@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:love_sync/l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../home/home_screen.dart';
 
@@ -29,6 +30,7 @@ class _PairingScreenState extends State<PairingScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       body: Stack(
@@ -52,7 +54,7 @@ class _PairingScreenState extends State<PairingScreen> {
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 title: Text(
-                  'Pairing',
+                  l10n.pairingTitle,
                   style: GoogleFonts.nunito(
                     color: Colors.black87,
                     fontWeight: FontWeight.bold,
@@ -61,16 +63,16 @@ class _PairingScreenState extends State<PairingScreen> {
                 bottom: TabBar(
                   labelColor: Colors.black87,
                   indicatorColor: Colors.black87,
-                  tabs: const [
-                    Tab(text: 'Create Room'),
-                    Tab(text: 'Join Room'),
+                  tabs: [
+                    Tab(text: l10n.createRoom),
+                    Tab(text: l10n.joinRoom),
                   ],
                 ),
               ),
               body: TabBarView(
                 children: [
-                  _buildCreateTab(authProvider),
-                  _buildJoinTab(authProvider),
+                  _buildCreateTab(authProvider, l10n),
+                  _buildJoinTab(authProvider, l10n),
                 ],
               ),
             ),
@@ -80,7 +82,7 @@ class _PairingScreenState extends State<PairingScreen> {
     );
   }
 
-  Widget _buildCreateTab(AuthProvider auth) {
+  Widget _buildCreateTab(AuthProvider auth, AppLocalizations l10n) {
     return Center(
       child: _glassCard(
         child: Column(
@@ -89,7 +91,7 @@ class _PairingScreenState extends State<PairingScreen> {
             const Icon(Icons.favorite_outline, size: 64, color: Colors.black54),
             const SizedBox(height: 16),
             Text(
-              'Your Pairing Code',
+              l10n.yourPairingCode,
               style: GoogleFonts.nunito(fontSize: 18, color: Colors.black54),
             ),
             const SizedBox(height: 24),
@@ -112,11 +114,11 @@ class _PairingScreenState extends State<PairingScreen> {
                   if (mounted) {
                     ScaffoldMessenger.of(
                       context,
-                    ).showSnackBar(const SnackBar(content: Text('Copied!')));
+                    ).showSnackBar(SnackBar(content: Text(l10n.copied)));
                   }
                 },
                 icon: const Icon(Icons.copy, size: 18),
-                label: const Text('Copy Code'),
+                label: Text(l10n.copyCode),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black87,
@@ -131,7 +133,7 @@ class _PairingScreenState extends State<PairingScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Waiting for partner...',
+                l10n.waitingForPartner,
                 style: GoogleFonts.nunito(
                   fontSize: 14,
                   color: Colors.black45,
@@ -171,14 +173,12 @@ class _PairingScreenState extends State<PairingScreen> {
                     setState(() => _isCreating = false);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to generate code'),
-                        ),
+                        SnackBar(content: Text(l10n.generateCodeError)),
                       );
                     }
                   }
                 },
-                child: const Text('Generate Code'),
+                child: Text(l10n.generateCode),
               ),
           ],
         ),
@@ -186,14 +186,14 @@ class _PairingScreenState extends State<PairingScreen> {
     );
   }
 
-  Widget _buildJoinTab(AuthProvider auth) {
+  Widget _buildJoinTab(AuthProvider auth, AppLocalizations l10n) {
     return Center(
       child: _glassCard(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Enter Partner Code',
+              l10n.enterPartnerCode,
               style: GoogleFonts.nunito(fontSize: 18, color: Colors.black54),
             ),
             const SizedBox(height: 24),
@@ -250,7 +250,7 @@ class _PairingScreenState extends State<PairingScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Connect'),
+                child: Text(l10n.connect),
               ),
           ],
         ),

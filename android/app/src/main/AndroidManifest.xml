@@ -9,6 +9,7 @@
     <application
         android:label="App Bạn Gái"
         android:name="${applicationName}"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher">
 
         <provider

@@ -176,6 +176,35 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // --- Settings Methods ---
+
+  Future<void> updateName(String name) async {
+    if (_user == null) return;
+    await _dbService.updateDisplayName(_user!.uid, name);
+    // Optional: Update Firebase User Profile as well for consistency
+    await _user!.updateDisplayName(name);
+    await _user!.reload();
+    _user = FirebaseAuth.instance.currentUser;
+    notifyListeners();
+  }
+
+  Future<void> unpair() async {
+    if (_coupleId == null) return;
+
+    _setLoading(true);
+    // Call DB to unpair (Removes user2)
+    await _dbService.unpairUser(_coupleId!);
+
+    // Clear local
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('coupleId');
+    _coupleId = null;
+    _roomStream = null;
+
+    _setLoading(false);
+    notifyListeners();
+  }
+
   // Helper
   void _setLoading(bool value) {
     _isLoading = value;

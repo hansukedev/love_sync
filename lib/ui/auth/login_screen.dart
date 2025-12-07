@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:love_sync/l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 
 class LoginScreen extends StatelessWidget {
@@ -10,6 +11,7 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       body: Stack(
@@ -96,7 +98,8 @@ class LoginScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Connect with your partner',
+                        l10n.connectWithPartner,
+                        textAlign: TextAlign.center,
                         style: GoogleFonts.nunito(
                           fontSize: 14,
                           color: Colors.black54,
@@ -133,9 +136,12 @@ class LoginScreen extends StatelessWidget {
                                   showDialog(
                                     context: context,
                                     builder: (ctx) => AlertDialog(
-                                      title: const Text("Đăng nhập thất bại"),
+                                      title: Text(l10n.loginFailed),
                                       content: Text(
-                                        "Lỗi: ${authProvider.errorMessage ?? 'Không xác định'}\n\n(Nếu là bản Release, hãy kiểm tra SHA-1 trong Firebase)",
+                                        l10n.loginError(
+                                          authProvider.errorMessage ??
+                                              'Unknown',
+                                        ),
                                       ),
                                       actions: [
                                         TextButton(
@@ -152,8 +158,10 @@ class LoginScreen extends StatelessWidget {
                                   showDialog(
                                     context: context,
                                     builder: (ctx) => AlertDialog(
-                                      title: const Text("Lỗi Google Sign-In"),
-                                      content: Text("Chi tiết: $e"),
+                                      title: Text(l10n.googleSignInError),
+                                      content: Text(
+                                        l10n.loginError(e.toString()),
+                                      ),
                                       actions: [
                                         TextButton(
                                           onPressed: () => Navigator.pop(ctx),
@@ -170,7 +178,7 @@ class LoginScreen extends StatelessWidget {
                               color: Colors.redAccent,
                             ),
                             label: Text(
-                              'Tiếp tục với Google',
+                              l10n.continueWithGoogle,
                               style: GoogleFonts.nunito(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -201,8 +209,9 @@ class LoginScreen extends StatelessWidget {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      authProvider.errorMessage ??
-                                          "Lỗi ẩn danh",
+                                      l10n.loginError(
+                                        authProvider.errorMessage ?? "Unknown",
+                                      ),
                                     ),
                                   ),
                                 );
@@ -210,13 +219,17 @@ class LoginScreen extends StatelessWidget {
                             } catch (e) {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text("Lỗi: $e")),
+                                  SnackBar(
+                                    content: Text(
+                                      l10n.loginError(e.toString()),
+                                    ),
+                                  ),
                                 );
                               }
                             }
                           },
                           child: Text(
-                            'Vào ẩn danh',
+                            l10n.signInAnonymously,
                             style: GoogleFonts.nunito(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,

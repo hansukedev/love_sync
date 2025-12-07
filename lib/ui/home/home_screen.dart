@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:love_sync/l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/mood_provider.dart';
 import '../../services/update_service.dart';
@@ -12,10 +13,11 @@ import '../../services/database_service.dart'; // Added for DecisionTournamentDi
 // Widgets
 import 'widgets/anniversary_card.dart';
 import 'widgets/mood_section.dart';
-import 'widgets/love_touch_button.dart';
+
 import 'widgets/decision_tournament_dialog.dart';
 import 'widgets/tournament_reception_dialog.dart';
 import '../chat/chat_screen.dart';
+import '../settings/settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,6 +28,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _codeController = TextEditingController();
+  bool _isTournamentDialogShowing = false;
 
   @override
   void initState() {
@@ -55,12 +58,22 @@ class _HomeScreenState extends State<HomeScreen> {
       final senderId = data['senderId'];
 
       // Show dialog only if PENDING and NOT ME
+      // GUARD: If we already have a result (e.g. just decided), don't show request dialog
+      final moodProvider = Provider.of<MoodProvider>(context, listen: false);
+      if (moodProvider.currentValidDecision != null ||
+          moodProvider.isRejected) {
+        return;
+      }
+
       if (status == 'pending' && senderId != auth.user!.uid) {
         final options = List<String>.from(data['options'] ?? []);
 
         if (mounted) {
-          // Dismiss existing dialogs if needed or just show on top
-          // A better way is to check if we are already showing it, but for MVP:
+          // GUARD: Check if dialog is already showing
+          if (_isTournamentDialogShowing) return;
+
+          _isTournamentDialogShowing = true;
+
           showDialog(
             context: context,
             barrierDismissible: false,
@@ -81,7 +94,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
-          );
+          ).then((_) {
+            // Reset flag when dialog closes
+            if (mounted) {
+              _isTournamentDialogShowing = false;
+            }
+          });
         }
       }
     });
@@ -91,6 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     // Lắng nghe AuthProvider để biết trạng thái Loading hoặc Error
     final authProvider = Provider.of<AuthProvider>(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -106,17 +125,19 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black87),
-            onPressed: () async {
-              await authProvider.signOut();
-              // Không cần Navigator push vì main.dart đã tự điều hướng về Login
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
             },
           ),
         ],
       ),
       body: authProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _buildBody(context, authProvider),
+          : _buildBody(context, authProvider, l10n),
       floatingActionButton: authProvider.roomStream != null
           ? FloatingActionButton(
               backgroundColor: Colors.pinkAccent,
@@ -140,10 +161,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBody(BuildContext context, AuthProvider auth) {
+  Widget _buildBody(
+    BuildContext context,
+    AuthProvider auth,
+    AppLocalizations l10n,
+  ) {
     // TRƯỜNG HỢP 1: Chưa có phòng (Stream null) -> Hiện giao diện Tạo/Join
     if (auth.roomStream == null) {
-      return _buildUnpairedView(auth);
+      return _buildUnpairedView(auth, l10n);
     }
 
     // TRƯỜNG HỢP 2: Đã có phòng -> Lắng nghe thay đổi Realtime
@@ -162,10 +187,10 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text("Lỗi kết nối hoặc phòng đã bị hủy"),
+                Text(l10n.connectionError),
                 TextButton(
                   onPressed: () => auth.signOut(), // Reset state
-                  child: const Text("Quay lại"),
+                  child: Text(l10n.goBack),
                 ),
               ],
             ),
@@ -196,18 +221,20 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           });
 
-          return _buildPairedView(context, auth);
+          return _buildPairedView(context, auth, l10n);
         }
 
         // --- TRƯỜNG HỢP 2B: ĐANG CHỜ (WAITING) ---
-        return _buildWaitingView(context, auth, code);
+        return _buildWaitingView(context, auth, code, l10n);
       },
     );
   }
 
   // --- SUB VIEWS ---
 
-  Widget _buildUnpairedView(AuthProvider auth) {
+  // --- SUB VIEWS ---
+
+  Widget _buildUnpairedView(AuthProvider auth, AppLocalizations l10n) {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -234,7 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 child: Text(
-                  "Tạo Phòng Mới",
+                  l10n.createRoom,
                   style: GoogleFonts.nunito(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -251,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Text(
-                    "HOẶC",
+                    l10n.or,
                     style: GoogleFonts.nunito(color: Colors.grey),
                   ),
                 ),
@@ -264,8 +291,8 @@ class _HomeScreenState extends State<HomeScreen> {
             TextField(
               controller: _codeController,
               decoration: InputDecoration(
-                labelText: "Nhập mã kết nối",
-                hintText: "Ví dụ: DHAPW0",
+                labelText: l10n.enterCode,
+                hintText: "DHAPW0",
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -290,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 child: Text(
-                  "Tham Gia Phòng",
+                  l10n.joinRoom,
                   style: GoogleFonts.nunito(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -320,6 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
     BuildContext context,
     AuthProvider auth,
     String? code,
+    AppLocalizations l10n,
   ) {
     return Center(
       child: Padding(
@@ -330,7 +358,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const CircularProgressIndicator(),
             const SizedBox(height: 30),
             Text(
-              "Đang chờ người ấy...",
+              l10n.waitingForPartner,
               style: GoogleFonts.nunito(fontSize: 18, color: Colors.grey[700]),
             ),
             const SizedBox(height: 20),
@@ -359,20 +387,20 @@ class _HomeScreenState extends State<HomeScreen> {
             TextButton.icon(
               icon: const Icon(Icons.copy, color: Colors.grey),
               label: Text(
-                "Sao chép mã",
+                l10n.copyCode,
                 style: GoogleFonts.nunito(color: Colors.grey),
               ),
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: code ?? ""));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Đã sao chép mã!")),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(l10n.codeCopied)));
               },
             ),
             const SizedBox(height: 40),
             TextButton(
               onPressed: () => auth.signOut(),
-              child: const Text("Hủy bỏ"),
+              child: Text(l10n.cancel),
             ),
           ],
         ),
@@ -380,9 +408,33 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPairedView(BuildContext context, AuthProvider auth) {
+  Widget _buildPairedView(
+    BuildContext context,
+    AuthProvider auth,
+    AppLocalizations l10n,
+  ) {
     return Consumer<MoodProvider>(
       builder: (context, mood, child) {
+        // Check for Mood Alert
+        if (mood.shouldShowMoodAlert) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    l10n.partnerFeelingMessage(
+                      mood.partnerMood ?? '',
+                      mood.partnerMoodDesc ?? '',
+                    ),
+                  ),
+                  backgroundColor: Colors.pinkAccent,
+                ),
+              );
+              mood.consumeMoodAlert();
+            }
+          });
+        }
+
         return Center(
           child: SingleChildScrollView(
             // Thêm Scroll để tránh overflow
@@ -412,7 +464,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            "Chốt đơn: ${mood.currentValidDecision}!",
+                            l10n.decisionResult(mood.currentValidDecision!),
                             style: GoogleFonts.nunito(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -442,7 +494,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            "Phản đối: ${mood.decisionReason ?? 'Không rõ lý do'}",
+                            l10n.decisionRejectedReason(
+                              mood.decisionReason ?? l10n.unknownReason,
+                            ),
                             style: GoogleFonts.nunito(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -466,11 +520,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 30),
 
-                // 4. LOVE TOUCH BUTTON
-                LoveTouchButton(auth: auth, mood: mood),
-
-                const SizedBox(height: 30),
-
                 // 5. Decision Tournament Button
                 TextButton.icon(
                   onPressed: () {
@@ -485,7 +534,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               options,
                             );
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Đã gửi lời mời!")),
+                              SnackBar(content: Text(l10n.invitationSent)),
                             );
                           }
                         },
@@ -494,7 +543,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                   icon: const Icon(Icons.casino, color: Colors.deepPurple),
                   label: Text(
-                    "Help us Decide!",
+                    l10n.helpUsDecide,
                     style: GoogleFonts.nunito(
                       color: Colors.deepPurple,
                       fontWeight: FontWeight.bold,

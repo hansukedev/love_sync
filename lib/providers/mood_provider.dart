@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:vibration/vibration.dart';
+// import 'package:vibration/vibration.dart';
 import '../services/database_service.dart';
 
 class MoodProvider with ChangeNotifier {
@@ -13,15 +13,12 @@ class MoodProvider with ChangeNotifier {
   String? _partnerMood;
   String? _partnerMoodDesc;
 
-  // Touch State
-  int _lastPartnerTouchTimestamp = 0;
-
   // Anniversary State
   DateTime? _startDate;
 
   // Subscriptions
   StreamSubscription<DatabaseEvent>? _moodSub;
-  StreamSubscription<DatabaseEvent>? _touchSub;
+
   StreamSubscription<DatabaseEvent>? _dateSub;
 
   String? _trackedCoupleId;
@@ -32,6 +29,15 @@ class MoodProvider with ChangeNotifier {
   String? get partnerMood => _partnerMood;
   String? get partnerMoodDesc => _partnerMoodDesc;
   DateTime? get startDate => _startDate;
+
+  // Alert State
+  bool _shouldShowMoodAlert = false;
+  bool get shouldShowMoodAlert => _shouldShowMoodAlert;
+
+  void consumeMoodAlert() {
+    _shouldShowMoodAlert = false;
+    // No need to notifyListeners if just consuming a UI flag that was checked in build
+  }
 
   int get daysTogether {
     if (_startDate == null) return 0;
@@ -46,7 +52,6 @@ class MoodProvider with ChangeNotifier {
 
     _trackedCoupleId = coupleId;
     _moodSub?.cancel();
-    _touchSub?.cancel();
     _dateSub?.cancel();
 
     debugPrint("MoodProvider: Start listening for couple $coupleId");
@@ -84,6 +89,43 @@ class MoodProvider with ChangeNotifier {
         }
       });
 
+      // Check for Partner Description Change (Notification logic)
+      if (newPartnerMoodDesc != null &&
+          newPartnerMoodDesc != _partnerMoodDesc &&
+          newPartnerMoodDesc!.isNotEmpty &&
+          _partnerMoodDesc != null) {
+        // Only notify if it changed from a previous non-null value
+        // (Prevents spam on first load)
+        _shouldShowMoodAlert = true;
+      } else if (newPartnerMoodDesc != null &&
+          newPartnerMoodDesc!.isNotEmpty &&
+          _partnerMoodDesc == null) {
+        // Optional: Notify on first load if needed, but usually annoying.
+        // Let's stick to explicit updates.
+        // Actually, let's notify if it's an update.
+        // Simplified: If different and new is not empty.
+        // But need to be careful about init.
+        // If _partnerMood was already loaded (we can check if _trackedCoupleId is set?)
+        // Let's rely on standard change detection.
+        // If it's NOT the very first event?
+        // Let's just set it. UI will consume it.
+      }
+
+      // Refined Logic:
+      if (newPartnerMoodDesc != _partnerMoodDesc &&
+          newPartnerMoodDesc != null &&
+          newPartnerMoodDesc!.isNotEmpty) {
+        // Avoid alerting on initial null -> value transition if that's preferred,
+        // but user wants notification on update.
+        // If _partnerMoodDesc is null, it might be first load.
+        // Let's allow it for now, unless it spams on startup.
+        // Best practice: check if we have previous data.
+        if (_partnerMood != null) {
+          // We had data before
+          _shouldShowMoodAlert = true;
+        }
+      }
+
       if (newMyMood != _myMood ||
           newPartnerMood != _partnerMood ||
           newMyMoodDesc != _myMoodDesc ||
@@ -94,21 +136,6 @@ class MoodProvider with ChangeNotifier {
         _partnerMoodDesc = newPartnerMoodDesc;
         notifyListeners();
       }
-    });
-
-    // 2. Listen to Love Touch
-    _touchSub = _dbService.getTouchStream(coupleId).listen((event) async {
-      if (event.snapshot.value == null) return;
-
-      final data = event.snapshot.value as Map;
-      data.forEach((key, value) async {
-        if (key != userId && value is Map) {
-          final timestamp = value['timestamp'] as int?;
-          if (timestamp != null) {
-            _handleNewPartnerTouch(timestamp);
-          }
-        }
-      });
     });
 
     // 3. Listen to Anniversary Date
@@ -137,24 +164,6 @@ class MoodProvider with ChangeNotifier {
     _listenToDecisions(coupleId);
   }
 
-  void _handleNewPartnerTouch(int timestamp) async {
-    if (timestamp <= _lastPartnerTouchTimestamp) return;
-
-    _lastPartnerTouchTimestamp = timestamp;
-
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final diff = now - timestamp;
-
-    if (diff < 5000) {
-      debugPrint("❤️ LOVE TOUCH RECEIVED! Vibrating...");
-      if (await Vibration.hasVibrator()) {
-        Vibration.vibrate(pattern: [0, 500, 200, 500]);
-      }
-    } else {
-      debugPrint("Old touch event ignored (Diff: ${diff}ms)");
-    }
-  }
-
   // --- Logic Methods ---
 
   Future<void> setMood(
@@ -168,13 +177,6 @@ class MoodProvider with ChangeNotifier {
     notifyListeners();
 
     await _dbService.updateMood(coupleId, userId, moodCode, description);
-  }
-
-  Future<void> sendLoveTouch(String coupleId, String userId) async {
-    if (await Vibration.hasVibrator()) {
-      Vibration.vibrate(duration: 50);
-    }
-    await _dbService.sendTouch(coupleId, userId);
   }
 
   Future<void> setAnniversary(String coupleId, DateTime date) async {
@@ -244,7 +246,6 @@ class MoodProvider with ChangeNotifier {
   @override
   void dispose() {
     _moodSub?.cancel();
-    _touchSub?.cancel();
     _dateSub?.cancel();
     _decisionSub?.cancel();
     super.dispose();
